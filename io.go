@@ -142,11 +142,96 @@ func (ann *Fann[T]) Save(filename string) error {
 	return nil
 }
 
-// SaveToFixed saves the network in fixed-point format
-func (ann *Fann[T]) SaveToFixed(filename string) error {
-	// For now, just save as floating point
-	// TODO: Implement actual fixed-point conversion
-	return ann.Save(filename)
+// SaveToFixed saves the network in fixed-point format with specified decimal precision
+func (ann *Fann[T]) SaveToFixed(filename string, decimalPoint uint) error {
+	file, err := os.Create(filename)
+	if err != nil {
+		return fmt.Errorf("can't create fixed-point config file: %w", err)
+	}
+	defer file.Close()
+
+	writer := bufio.NewWriter(file)
+	defer writer.Flush()
+
+	// Calculate multiplier for fixed point conversion
+	multiplier := float64(uint(1) << decimalPoint)
+
+	// Write header - same format as regular FANN files but indicate fixed-point
+	fmt.Fprintf(writer, "FANN_FIX_%d.0\n", 1<<decimalPoint) // Fixed-point indicator
+	fmt.Fprintf(writer, "num_layers=%d\n", len(ann.layers))
+	fmt.Fprintf(writer, "learning_rate=%d\n", int(float64(ann.learningRate)*multiplier))
+	fmt.Fprintf(writer, "connection_rate=%d\n", int(float64(ann.connectionRate)*multiplier))
+	fmt.Fprintf(writer, "network_type=%d\n", int(ann.networkType))
+	fmt.Fprintf(writer, "learning_momentum=%d\n", int(float64(ann.learningMomentum)*multiplier))
+	fmt.Fprintf(writer, "training_algorithm=%d\n", int(ann.trainingAlgorithm))
+	fmt.Fprintf(writer, "train_error_function=%d\n", int(ann.trainErrorFunction))
+	fmt.Fprintf(writer, "train_stop_function=%d\n", int(ann.trainStopFunction))
+	fmt.Fprintf(writer, "cascade_output_change_fraction=%d\n", int(float64(ann.cascadeOutputChangeFraction)*multiplier))
+	fmt.Fprintf(writer, "quickprop_decay=%d\n", int(float64(ann.quickpropDecay)*multiplier))
+	fmt.Fprintf(writer, "quickprop_mu=%d\n", int(float64(ann.quickpropMu)*multiplier))
+	fmt.Fprintf(writer, "rprop_increase_factor=%d\n", int(float64(ann.rpropIncreaseFactor)*multiplier))
+	fmt.Fprintf(writer, "rprop_decrease_factor=%d\n", int(float64(ann.rpropDecreaseFactor)*multiplier))
+	fmt.Fprintf(writer, "rprop_delta_min=%d\n", int(float64(ann.rpropDeltaMin)*multiplier))
+	fmt.Fprintf(writer, "rprop_delta_max=%d\n", int(float64(ann.rpropDeltaMax)*multiplier))
+	fmt.Fprintf(writer, "rprop_delta_zero=%d\n", int(float64(ann.rpropDeltaZero)*multiplier))
+	fmt.Fprintf(writer, "cascade_output_stagnation_epochs=%d\n", ann.cascadeOutputStagnationEpochs)
+	fmt.Fprintf(writer, "cascade_candidate_change_fraction=%d\n", int(float64(ann.cascadeCandidateChangeFraction)*multiplier))
+	fmt.Fprintf(writer, "cascade_candidate_stagnation_epochs=%d\n", ann.cascadeCandidateStagnationEpochs)
+	fmt.Fprintf(writer, "cascade_max_out_epochs=%d\n", ann.cascadeMaxOutEpochs)
+	fmt.Fprintf(writer, "cascade_min_out_epochs=%d\n", ann.cascadeMinOutEpochs)
+	fmt.Fprintf(writer, "cascade_max_cand_epochs=%d\n", ann.cascadeMaxCandEpochs)
+	fmt.Fprintf(writer, "cascade_min_cand_epochs=%d\n", ann.cascadeMinCandEpochs)
+	fmt.Fprintf(writer, "cascade_num_candidate_groups=%d\n", ann.cascadeNumCandidateGroups)
+	fmt.Fprintf(writer, "bit_fail_limit=%d\n", int(float64(ann.bitFailLimit)*multiplier))
+	fmt.Fprintf(writer, "cascade_candidate_limit=%d\n", int(float64(ann.cascadeCandidateLimit)*multiplier))
+	fmt.Fprintf(writer, "cascade_weight_multiplier=%d\n", int(float64(ann.cascadeWeightMultiplier)*multiplier))
+	fmt.Fprintf(writer, "cascade_activation_functions_count=%d\n", len(ann.cascadeActivationFunctions))
+	
+	// Write activation functions
+	for _, af := range ann.cascadeActivationFunctions {
+		fmt.Fprintf(writer, "%d ", int(af))
+	}
+	fmt.Fprintln(writer)
+	
+	fmt.Fprintf(writer, "cascade_activation_steepnesses_count=%d\n", len(ann.cascadeActivationSteepnesses))
+	
+	// Write activation steepnesses as fixed-point
+	for _, steepness := range ann.cascadeActivationSteepnesses {
+		fmt.Fprintf(writer, "%d ", int(float64(steepness)*multiplier))
+	}
+	fmt.Fprintln(writer)
+
+	// Write layer info
+	fmt.Fprintf(writer, "layer_sizes:")
+	for _, layer := range ann.layers {
+		fmt.Fprintf(writer, "%d ", layer.lastNeuron-layer.firstNeuron)
+	}
+	fmt.Fprintln(writer)
+
+	fmt.Fprintf(writer, "scale_included=0\n") // Fixed-point doesn't use scaling
+	fmt.Fprintf(writer, "neurons (num_inputs, activation_function, activation_steepness):\n")
+
+	// Write neuron info with fixed-point steepness
+	for i := 0; i < ann.totalNeurons; i++ {
+		neuron := ann.neurons[i]
+		numConnections := neuron.lastCon - neuron.firstCon
+		steepnessFixed := int(float64(neuron.activationSteepness) * multiplier)
+		fmt.Fprintf(writer, "(%d, %d, %d)\n", numConnections, int(neuron.activationFunction), steepnessFixed)
+	}
+
+	fmt.Fprintf(writer, "connections (connected_to_neuron, weight):\n")
+	
+	// Write connections with fixed-point weights
+	for i := 0; i < ann.totalNeurons; i++ {
+		neuron := ann.neurons[i]
+		for connIdx := neuron.firstCon; connIdx < neuron.lastCon; connIdx++ {
+			sourceNeuron := ann.connections[connIdx]
+			weightFixed := int(float64(ann.weights[connIdx]) * multiplier)
+			fmt.Fprintf(writer, "(%d, %d)\n", sourceNeuron, weightFixed)
+		}
+	}
+
+	return nil
 }
 
 // CreateFromFile loads a neural network from a file

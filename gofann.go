@@ -377,7 +377,43 @@ func (ann *Fann[T]) setupConnections(netType NetworkType, connectionRate float32
 			}
 		}
 	case NetTypeShortcut:
-		// TODO: Implement shortcut connections
+		// Each layer connects to ALL following layers (not just the next one)
+		for i := 0; i < len(ann.layers)-1; i++ {
+			srcLayer := ann.layers[i]
+			
+			// Connect to all layers that come after this one
+			for j := i + 1; j < len(ann.layers); j++ {
+				dstLayer := ann.layers[j]
+				
+				for dst := dstLayer.firstNeuron; dst < dstLayer.lastNeuron; dst++ {
+					// Skip bias neuron connections (bias neurons don't receive inputs)
+					if j < len(ann.layers)-1 && dst == dstLayer.lastNeuron-1 {
+						continue
+					}
+					
+					// Set connection range for this destination neuron
+					if ann.neurons[dst].firstCon == 0 && connIdx > 0 {
+						ann.neurons[dst].firstCon = connIdx
+					}
+					
+					// Connect to all neurons in this source layer
+					for src := srcLayer.firstNeuron; src < srcLayer.lastNeuron; src++ {
+						if connectionRate < 1.0 {
+							// For sparse shortcut networks, limit connections per neuron
+							currentConnections := connIdx - ann.neurons[dst].firstCon
+							maxConnections := int(float32(srcLayer.lastNeuron-srcLayer.firstNeuron) * connectionRate)
+							if currentConnections >= maxConnections {
+								break
+							}
+						}
+						ann.connections[connIdx] = src
+						connIdx++
+					}
+					
+					ann.neurons[dst].lastCon = connIdx
+				}
+			}
+		}
 	}
 }
 
