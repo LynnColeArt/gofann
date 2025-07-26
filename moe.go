@@ -151,10 +151,11 @@ func NewMoERouter[T Numeric](experts []*ReflectiveExpert[T]) *MoERouter[T] {
 	numExperts := len(experts)
 	
 	// Create gating network that learns expert selection
-	gatingInputSize := 0
+	inputSize := 10 // Default input size
 	if len(experts) > 0 && experts[0].network != nil {
-		gatingInputSize = experts[0].network.numInput + numExperts  // input + expert_confidences
+		inputSize = experts[0].network.numInput
 	}
+	gatingInputSize := inputSize + numExperts  // input + expert_confidences
 	
 	router := &MoERouter[T]{
 		experts:   experts,
@@ -168,7 +169,7 @@ func NewMoERouter[T Numeric](experts []*ReflectiveExpert[T]) *MoERouter[T] {
 		expertSelector: &ExpertSelector[T]{
 			selectionStrategy: SelectDynamic,
 			diversityBonus:   T(0.1),
-			domainClassifier: CreateStandard[T](gatingInputSize, 20, numExperts),
+			domainClassifier: CreateStandard[T](inputSize, 20, numExperts),
 		},
 		
 		fusionEngine: &FusionEngine[T]{
@@ -223,7 +224,7 @@ func NewReflectiveExpert[T Numeric](name, domain string, networkLayers []int) *R
 		},
 		
 		weaknessProfile:      make(map[string]T),
-		confidenceModel:     CreateStandard[T](networkLayers[0], 10, 1),
+		confidenceModel:     CreateStandard[T](networkLayers[0]+1, 10, 1), // +1 for accuracy feature
 		collaborationHistory: make(map[string]T),
 		
 		knowledgeTransfer: &KnowledgeTransfer[T]{
@@ -325,7 +326,7 @@ func (router *MoERouter[T]) TrainExperts(domainData map[string]*TrainData[T]) {
 	wg.Wait()
 	
 	// Train the router's gating and fusion networks
-	router.trainRoutingNetworks()
+	router.TrainRoutingNetworks()
 	
 	fmt.Printf("🎯 All experts trained and router networks updated!\n")
 }
@@ -357,10 +358,38 @@ func (router *MoERouter[T]) getExpertConfidences(input []T) []T {
 
 func (router *MoERouter[T]) classifyDomain(input []T) []T {
 	// Use domain classifier to understand what type of problem this is
-	return router.expertSelector.domainClassifier.Run(input)
+	result := router.expertSelector.domainClassifier.Run(input)
+	
+	// Safety check - if classifier returns empty or wrong size, use defaults
+	if len(result) != len(router.experts) {
+		defaultScores := make([]T, len(router.experts))
+		for i := range defaultScores {
+			defaultScores[i] = T(1.0) / T(len(router.experts))
+		}
+		return defaultScores
+	}
+	
+	return result
 }
 
 func (router *MoERouter[T]) selectExperts(input []T, confidences []T, domainScores []T) ([]int, []T) {
+	// Safety check
+	if len(router.experts) == 0 || len(confidences) == 0 {
+		return []int{}, []T{}
+	}
+	
+	// Ensure arrays are same length
+	if len(confidences) != len(router.experts) || len(domainScores) != len(router.experts) {
+		// Fallback to equal weighting
+		selectedExperts := make([]int, 0)
+		weights := make([]T, 0)
+		for i := range router.experts {
+			selectedExperts = append(selectedExperts, i)
+			weights = append(weights, T(1.0)/T(len(router.experts)))
+		}
+		return selectedExperts, weights
+	}
+	
 	// Combine confidence and domain scores
 	combinedScores := make([]T, len(router.experts))
 	for i := range combinedScores {
@@ -561,6 +590,44 @@ func (expert *ReflectiveExpert[T]) updateDomainKnowledge(data *TrainData[T]) {
 	// This would be domain-specific implementation
 }
 
+// Name returns the expert's name
+func (expert *ReflectiveExpert[T]) Name() string {
+	expert.mu.RLock()
+	defer expert.mu.RUnlock()
+	return expert.name
+}
+
+// Domain returns the expert's domain
+func (expert *ReflectiveExpert[T]) Domain() string {
+	expert.mu.RLock()
+	defer expert.mu.RUnlock()
+	return expert.domain
+}
+
+// Trainer returns the expert's reflective trainer
+func (expert *ReflectiveExpert[T]) Trainer() *ReflectiveTrainer[T] {
+	expert.mu.RLock()
+	defer expert.mu.RUnlock()
+	return expert.trainer
+}
+
+// Accuracy returns the expert's current accuracy
+func (expert *ReflectiveExpert[T]) Accuracy() T {
+	expert.mu.RLock()
+	defer expert.mu.RUnlock()
+	return expert.accuracy
+}
+
+// Confidence returns the routing decision confidence
+func (decision *RoutingDecision[T]) Confidence() T {
+	return decision.confidence
+}
+
+// SelectedExperts returns the selected expert indices
+func (decision *RoutingDecision[T]) SelectedExperts() []int {
+	return decision.selectedExperts
+}
+
 // Helper methods for router
 
 func (router *MoERouter[T]) calculateDecisionConfidence(expertConfidences []T, selectedExperts []int) T {
@@ -613,7 +680,7 @@ func (router *MoERouter[T]) recordRoutingDecision(decision RoutingDecision[T]) {
 	}
 }
 
-func (router *MoERouter[T]) trainRoutingNetworks() {
+func (router *MoERouter[T]) TrainRoutingNetworks() {
 	// Train gating and fusion networks based on routing history
 	// This would use the recorded decisions to improve routing over time
 	fmt.Printf("   🎯 Training routing networks on %d historical decisions\n", 
