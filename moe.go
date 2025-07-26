@@ -14,6 +14,7 @@ package gofann
 
 import (
 	"fmt"
+	"math"
 	"sort"
 	"sync"
 )
@@ -168,7 +169,7 @@ func NewMoERouter[T Numeric](experts []*ReflectiveExpert[T]) *MoERouter[T] {
 		
 		expertSelector: &ExpertSelector[T]{
 			selectionStrategy: SelectDynamic,
-			diversityBonus:   T(0.1),
+			diversityBonus:   T(DefaultDiversityBonus),
 			domainClassifier: CreateStandard[T](inputSize, 20, numExperts),
 		},
 		
@@ -393,7 +394,7 @@ func (router *MoERouter[T]) selectExperts(input []T, confidences []T, domainScor
 	// Combine confidence and domain scores
 	combinedScores := make([]T, len(router.experts))
 	for i := range combinedScores {
-		combinedScores[i] = confidences[i]*T(0.7) + domainScores[i]*T(0.3)
+		combinedScores[i] = confidences[i]*T(DefaultConfidenceWeightFactor) + domainScores[i]*T(DefaultDomainWeightFactor)
 	}
 	
 	// Select top experts based on combined scores
@@ -587,7 +588,50 @@ func (expert *ReflectiveExpert[T]) updateWeaknessProfile(weaknesses []Weakness[T
 
 func (expert *ReflectiveExpert[T]) updateDomainKnowledge(data *TrainData[T]) {
 	// Analyze training data to understand domain patterns
-	// This would be domain-specific implementation
+	if expert.domainKnowledge == nil || data == nil {
+		return
+	}
+	
+	// Update pattern complexity based on variance in outputs
+	for i := 0; i < data.numData; i++ {
+		output := data.GetOutput(i)
+		if output == nil {
+			continue
+		}
+		
+		// Calculate output entropy as a measure of complexity
+		entropy := T(0)
+		sum := T(0)
+		for _, val := range output {
+			if val > 0 {
+				sum += val
+			}
+		}
+		
+		if sum > 0 {
+			for _, val := range output {
+				if val > 0 {
+					p := val / sum
+					entropy -= p * T(math.Log(float64(p)))
+				}
+			}
+		}
+		
+		// Store complexity metric
+		patternID := fmt.Sprintf("pattern_%d", i)
+		expert.domainKnowledge.complexity[patternID] = entropy
+		
+		// Update mastery based on training performance
+		if expert.accuracy > T(0.8) {
+			expert.domainKnowledge.mastery[patternID] = expert.accuracy
+		}
+	}
+	
+	// Update patterns list with unique patterns found
+	expert.domainKnowledge.patterns = make([]string, 0, len(expert.domainKnowledge.complexity))
+	for pattern := range expert.domainKnowledge.complexity {
+		expert.domainKnowledge.patterns = append(expert.domainKnowledge.patterns, pattern)
+	}
 }
 
 // Name returns the expert's name

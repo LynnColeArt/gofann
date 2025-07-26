@@ -248,25 +248,25 @@ func createNetwork[T Numeric](netType NetworkType, connectionRate float32, layer
 	ann := &Fann[T]{
 		networkType:       netType,
 		connectionRate:    connectionRate,
-		learningRate:      0.7,
-		learningMomentum:  0.0,
+		learningRate:      DefaultLearningRate,
+		learningMomentum:  DefaultLearningMomentum,
 		trainingAlgorithm: TrainRPROP,
 		trainErrorFunction: ErrorTanh,
-		bitFailLimit:      T(0.35),
+		bitFailLimit:      T(DefaultBitFailLimit),
 		// RPROP defaults
-		rpropIncreaseFactor: 1.2,
-		rpropDecreaseFactor: 0.5,
-		rpropDeltaMin:      0.000001,
-		rpropDeltaMax:      50.0,
-		rpropDeltaZero:     0.0125,
+		rpropIncreaseFactor: DefaultRpropIncreaseFactor,
+		rpropDecreaseFactor: DefaultRpropDecreaseFactor,
+		rpropDeltaMin:      DefaultRpropDeltaMin,
+		rpropDeltaMax:      DefaultRpropDeltaMax,
+		rpropDeltaZero:     DefaultRpropDeltaZero,
 		// Quickprop defaults
-		quickpropDecay: -0.0001,
-		quickpropMu:    1.75,
+		quickpropDecay: DefaultQuickpropDecay,
+		quickpropMu:    DefaultQuickpropMu,
 		// Sarprop defaults
-		sarpropWeightDecayShift:         -6.644,
-		sarpropStepErrorThresholdFactor: 0.1,
-		sarpropStepErrorShift:           1.385,
-		sarpropTemperature:              0.015,
+		sarpropWeightDecayShift:         DefaultSarpropWeightDecayShift,
+		sarpropStepErrorThresholdFactor: DefaultSarpropStepErrorThresholdFactor,
+		sarpropStepErrorShift:           DefaultSarpropStepErrorShift,
+		sarpropTemperature:              DefaultSarpropTemperature,
 		sarpropEpoch:                    0,
 	}
 
@@ -301,7 +301,7 @@ func createNetwork[T Numeric](netType NetworkType, connectionRate float32, layer
 	// Initialize neurons
 	for i := range ann.neurons {
 		ann.neurons[i].activationFunction = Sigmoid
-		ann.neurons[i].activationSteepness = T(0.5)
+		ann.neurons[i].activationSteepness = T(DefaultActivationSteepnessHidden)
 	}
 
 	// Set up connections
@@ -714,7 +714,7 @@ func CreateCascade[T Numeric](numInput, numOutput int) *Fann[T] {
 	net.cascadeActivationSteepnesses = []T{T(0.25), T(0.5), T(0.75), T(1.0)}
 	
 	// Set cascade weight multiplier
-	net.cascadeWeightMultiplier = T(0.4)
+	net.cascadeWeightMultiplier = T(DefaultCascadeWeightMultiplier)
 	
 	// Set more conservative RPROP parameters for cascade
 	net.rpropDeltaZero = 0.01      // Smaller initial step
@@ -722,7 +722,7 @@ func CreateCascade[T Numeric](numInput, numOutput int) *Fann[T] {
 	
 	// Use Batch training by default for cascade (RPROP can cause output collapse)
 	net.SetTrainingAlgorithm(TrainBatch)
-	net.SetLearningRate(0.7) // Higher learning rate for cascade
+	net.SetLearningRate(DefaultLearningRate) // Higher learning rate for cascade
 	
 	return net
 }

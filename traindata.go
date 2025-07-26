@@ -407,8 +407,18 @@ func (ann *Fann[T]) InitWeights(data *TrainData[T]) {
 	outputRange := float64(maxOutput - minOutput)
 	
 	// Calculate weight range based on network topology
-	numConnPerNeuron := float64(ann.totalConnections) / float64(ann.totalNeurons-ann.numInput)
-	weightRange := math.Pow(0.7*float64(len(ann.layers)), 1.0/float64(ann.numInput)) / 
+	neuronsExceptInput := ann.totalNeurons - ann.numInput
+	if neuronsExceptInput == 0 {
+		neuronsExceptInput = 1 // Prevent division by zero
+	}
+	numConnPerNeuron := float64(ann.totalConnections) / float64(neuronsExceptInput)
+	
+	// Prevent division by zero in power calculation
+	inputDivisor := float64(ann.numInput)
+	if inputDivisor == 0 {
+		inputDivisor = 1
+	}
+	weightRange := math.Pow(0.7*float64(len(ann.layers)), 1.0/inputDivisor) / 
 		math.Sqrt(numConnPerNeuron)
 	
 	if inputRange > 0 {

@@ -320,7 +320,7 @@ func (ann *Fann[T]) calculateMSE(desiredOutput []T) {
 
 // GetMSE returns the mean squared error
 func (ann *Fann[T]) GetMSE() float32 {
-	if ann.numMSE == 0 {
+	if ann.numMSE == 0 || ann.numOutput == 0 {
 		return 0
 	}
 	return ann.mse / float32(ann.numMSE) / float32(ann.numOutput)
@@ -401,7 +401,7 @@ func (ann *Fann[T]) updateWeightsQuickprop(numData int) {
 			slopeDiff := slope - prevSlope
 			
 			// Standard Quickprop formula
-			if abs(slopeDiff) > T(0.000001) && abs(prevDelta) > T(0.000001) {
+			if abs(slopeDiff) > T(EpsilonQuickprop) && abs(prevDelta) > T(EpsilonQuickprop) {
 				// Calculate Quickprop step
 				delta = -slope * prevDelta / slopeDiff
 				

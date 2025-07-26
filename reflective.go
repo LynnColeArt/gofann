@@ -16,7 +16,10 @@ package gofann
 import (
 	"fmt"
 	"math"
+	"math/rand"
 	"sort"
+	"strconv"
+	"strings"
 )
 
 // ReflectiveTrainer implements Lane Cunningham's self-improving training methodology
@@ -403,13 +406,66 @@ func (rt *ReflectiveTrainer[T]) checkConvergence(metrics *ReflectionMetrics[T]) 
 }
 
 func (rt *ReflectiveTrainer[T]) generateSyntheticInput(weakness Weakness[T]) []T {
-	// Placeholder - would be domain-specific
-	return make([]T, rt.network.numInput)
+	// Generate synthetic input that targets the identified weakness
+	input := make([]T, rt.network.numInput)
+	
+	// Initialize with small random values
+	for i := range input {
+		input[i] = T(rand.Float64()*0.2 - 0.1) // Small perturbations around 0
+	}
+	
+	// If we have examples that caused confusion, create variations
+	if len(weakness.Examples) > 0 && rt.dataAugmenter != nil {
+		// Apply augmentation strategies to create variations
+		for range rt.dataAugmenter.variationStrategies {
+			// Note: This requires the strategy interface to be properly implemented
+			// For now, we add random noise to create variations
+			diversityFloat := float64(rt.dataAugmenter.diversityFactor)
+			for i := range input {
+				input[i] += T(rand.Float64()*diversityFloat*2 - diversityFloat)
+			}
+		}
+	}
+	
+	return input
 }
 
 func (rt *ReflectiveTrainer[T]) generateSyntheticOutput(weakness Weakness[T]) []T {
-	// Placeholder - would be domain-specific  
-	return make([]T, rt.network.numOutput)
+	// Generate synthetic output that represents the correct classification
+	output := make([]T, rt.network.numOutput)
+	
+	// Extract the correct class from the weakness pattern
+	// The pattern format is "class_X confused with class_Y"
+	parts := strings.Split(weakness.Pattern, " ")
+	if len(parts) >= 1 {
+		// Try to extract class index from pattern like "class_0"
+		if strings.HasPrefix(parts[0], "class_") {
+			classStr := strings.TrimPrefix(parts[0], "class_")
+			if classIdx, err := strconv.Atoi(classStr); err == nil && 
+				classIdx >= 0 && classIdx < len(output) {
+				// Set the correct class to 1, others to 0
+				output[classIdx] = T(1)
+				return output
+			}
+		}
+	}
+	
+	// Fallback: if we can't parse the pattern, create a one-hot vector
+	// with some noise to encourage robustness
+	if len(output) > 0 {
+		// Random class selection if pattern parsing fails
+		correctClass := rand.Intn(len(output))
+		output[correctClass] = T(0.9 + rand.Float64()*0.1) // High confidence
+		
+		// Add small noise to other outputs
+		for i := range output {
+			if i != correctClass {
+				output[i] = T(rand.Float64() * 0.1) // Small noise
+			}
+		}
+	}
+	
+	return output
 }
 
 func (rt *ReflectiveTrainer[T]) printCycleReport(metrics ReflectionMetrics[T], weaknesses []Weakness[T]) {
