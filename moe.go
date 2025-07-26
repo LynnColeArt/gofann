@@ -209,6 +209,8 @@ func NewMoERouter[T Numeric](experts []*ReflectiveExpert[T]) *MoERouter[T] {
 // NewReflectiveExpert creates a self-aware domain specialist
 func NewReflectiveExpert[T Numeric](name, domain string, networkLayers []int) *ReflectiveExpert[T] {
 	network := CreateStandard[T](networkLayers...)
+	network.SetActivationFunctionHidden(SigmoidSymmetric)
+	network.SetActivationFunctionOutput(Sigmoid)
 	
 	expert := &ReflectiveExpert[T]{
 		name:    name,
@@ -225,7 +227,7 @@ func NewReflectiveExpert[T Numeric](name, domain string, networkLayers []int) *R
 		},
 		
 		weaknessProfile:      make(map[string]T),
-		confidenceModel:     CreateStandard[T](networkLayers[0]+1, 10, 1), // +1 for accuracy feature
+		confidenceModel:     nil, // Will be set after expert is created
 		collaborationHistory: make(map[string]T),
 		
 		knowledgeTransfer: &KnowledgeTransfer[T]{
@@ -234,12 +236,24 @@ func NewReflectiveExpert[T Numeric](name, domain string, networkLayers []int) *R
 		},
 	}
 	
+	// Set up confidence model
+	expert.confidenceModel = expert.createConfidenceModel(networkLayers[0])
+	
 	// Set up reflective training callbacks
 	expert.trainer.OnWeaknessDetected(func(weaknesses []Weakness[T]) {
 		expert.updateWeaknessProfile(weaknesses)
 	})
 	
 	return expert
+}
+
+// createConfidenceModel creates a network for confidence estimation
+func (expert *ReflectiveExpert[T]) createConfidenceModel(inputSize int) *Fann[T] {
+	model := CreateStandard[T](inputSize+1, 10, 1) // +1 for accuracy feature
+	model.SetActivationFunctionHidden(SigmoidSymmetric)
+	model.SetActivationFunctionOutput(Sigmoid)
+	model.RandomizeWeights(-1, 1)
+	return model
 }
 
 // Route implements the core MoE routing logic with cross-domain fusion
