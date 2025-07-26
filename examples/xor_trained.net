@@ -1,0 +1,46 @@
+FANN_FLO_2.1
+num_layers=3
+learning_rate=0.700000
+connection_rate=1.000000
+network_type=0
+learning_momentum=0.000000
+training_algorithm=2
+train_error_function=1
+train_stop_function=0
+cascade_output_change_fraction=0.000000
+quickprop_decay=-0.000100
+quickprop_mu=1.750000
+rprop_increase_factor=1.200000
+rprop_decrease_factor=0.500000
+rprop_delta_min=0.000001
+rprop_delta_max=50.000000
+rprop_delta_zero=0.012500
+cascade_output_stagnation_epochs=0
+cascade_candidate_change_fraction=0.000000
+cascade_candidate_stagnation_epochs=0
+cascade_max_out_epochs=0
+cascade_min_out_epochs=0
+cascade_max_cand_epochs=0
+cascade_min_cand_epochs=0
+cascade_num_candidate_groups=0
+bit_fail_limit=0.350000
+cascade_candidate_limit=0.000000
+cascade_weight_multiplier=0.000000
+cascade_activation_functions_count=0
+cascade_activation_functions=
+cascade_activation_steepnesses_count=0
+cascade_activation_steepnesses=
+layer_sizes=2 4 1
+scale_included=0
+neurons (num_inputs, activation_function, activation_steepness)=
+(0, 3, 0.500000) (0, 3, 0.500000) (1, 0, 0.000000) 
+(3, 5, 0.500000) (3, 5, 0.500000) (3, 5, 0.500000) (3, 5, 0.500000) (1, 0, 0.000000) 
+(5, 3, 0.500000) 
+connections (connected_to_neuron, weight)=
+
+(0, 11.476598) (1, 11.274972) (2, 8.897874) 
+(0, 8.802852) (1, 9.524265) (2, 8.191629) 
+(0, -12.456473) (1, -12.545244) (2, -10.111194) 
+(0, -10.372410) (1, -9.219712) (2, -8.963868) (0, 0.000000) 
+
+(3, -25.950630) (4, -10.674070) (5, 10.505254) (6, 26.533257) (7, -25.941551) 
